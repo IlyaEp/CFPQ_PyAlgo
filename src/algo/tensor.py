@@ -14,22 +14,31 @@ def tensor_algo(graph: LabelGraph, grammar: RecursiveAutomaton):
 
     sizeKron = graph.matrices_size * grammar.matrices_size()
 
-    kron = Matrix.sparse(BOOL, sizeKron, sizeKron)
+    prev_kron = Matrix.sparse(BOOL, sizeKron, sizeKron)
+    block = dict()
+    for label in grammar.S():
+        block.update({label: graph[label]})
     control_sum = 0
     count_tc = 0
     first_iter = True
     changed = True
     while changed:
+        kron = Matrix.sparse(BOOL, sizeKron, sizeKron)
         changed = False
 
         # calculate kronecker
-        for label in grammar.labels():
-            with semiring.LOR_LAND_BOOL:
-                kron += grammar.automaton()[label].kron(graph[label])
+        if first_iter:
+            for label in grammar.labels():
+                with semiring.LOR_LAND_BOOL:
+                    kron += grammar.automaton()[label].kron(graph[label])
+        else:
+            for label in grammar.S():
+                with semiring.LOR_LAND_BOOL:
+                    kron += grammar.automaton()[label].kron(block[label])
 
         kron.select(lib.GxB_NONZERO)
 
-        # transitive closer
+        # transitive closure
         prev = kron.nvals
         degree = kron
         transitive_changed = True
@@ -47,6 +56,10 @@ def tensor_algo(graph: LabelGraph, grammar: RecursiveAutomaton):
                 prev = cur
                 transitive_changed = True
 
+        if not first_iter:
+            kron = prev_kron + (prev_kron @ kron) @ prev_kron + prev_kron @ kron + kron @ prev_kron + kron
+
+        prev_kron = kron
         first_iter = False
 
         kron.select(lib.GxB_NONZERO)
@@ -59,16 +72,16 @@ def tensor_algo(graph: LabelGraph, grammar: RecursiveAutomaton):
 
                 start_i = i * graph.matrices_size
                 start_j = j * graph.matrices_size
-                block = kron[start_i:start_i + graph.matrices_size - 1, start_j: start_j + graph.matrices_size - 1]
-                block.select(lib.GxB_NONZERO)
+                block[start] = kron[start_i:start_i + graph.matrices_size - 1, start_j: start_j + graph.matrices_size - 1]
+                block[start].select(lib.GxB_NONZERO)
 
                 with semiring.LOR_LAND_BOOL:
-                    graph[start] += block
-                    graph[start].select(lib.GxB_NONZERO)
+                    graph[start] += block[start]
+                graph[start].select(lib.GxB_NONZERO)
                 new_control_sum = graph[start].nvals
 
                 if new_control_sum != control_sum:
                     changed = True
                     control_sum = new_control_sum
 
-    return control_sum, graph, kron, count_tc
+    return control_sum, graph, prev_kron, count_tc
