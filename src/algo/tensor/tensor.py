@@ -17,7 +17,7 @@ def tensor_algo(graph: LabelGraph, grammar: RecursiveAutomaton):
     prev_kron = Matrix.sparse(BOOL, sizeKron, sizeKron)
     block = dict()
     for label in grammar.S():
-        block.update({label: graph[label]})
+        block.update({label: Matrix.sparse(BOOL, graph.matrices_size, graph.matrices_size})
     control_sum = 0
     count_tc = 0
     first_iter = True
@@ -38,6 +38,10 @@ def tensor_algo(graph: LabelGraph, grammar: RecursiveAutomaton):
 
         kron.select(lib.GxB_NONZERO)
 
+		if not first_iter:
+            for label in grammar.S():
+                block.update({label: Matrix.sparse(BOOL, graph.matrices_size, graph.matrices_size})
+		
         # transitive closure
         prev = kron.nvals
         degree = kron
@@ -72,7 +76,7 @@ def tensor_algo(graph: LabelGraph, grammar: RecursiveAutomaton):
 
                 start_i = i * graph.matrices_size
                 start_j = j * graph.matrices_size
-                block[start] = kron[start_i:start_i + graph.matrices_size - 1, start_j: start_j + graph.matrices_size - 1]
+                block[start] += kron[start_i:start_i + graph.matrices_size - 1, start_j: start_j + graph.matrices_size - 1]
                 block[start].select(lib.GxB_NONZERO)
 
                 with semiring.LOR_LAND_BOOL:
