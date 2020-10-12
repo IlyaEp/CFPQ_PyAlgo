@@ -38,7 +38,7 @@ def tensor_algo(graph: LabelGraph, grammar: RecursiveAutomaton):
 
         kron.select(lib.GxB_NONZERO)
 
-		if not first_iter:
+	if not first_iter:
             for label in grammar.S():
                 block.update({label: Matrix.sparse(BOOL, graph.matrices_size, graph.matrices_size})
 		
